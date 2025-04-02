@@ -1,0 +1,264 @@
+@model IEnumerable<WebApplication1.Models.User>
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>STT</th>
+                <th>Tài khoản</th>
+                <th>Họ tên</th>
+                <th>Ngày sinh</th>
+                <th>Giới tính</th>
+                <th>Số điện thoại</th>
+                <th>Email</th>
+                <th>Nhóm</th>
+                <th>Thao tác</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model != null && Model.Any())
+            {
+                foreach (var user in Model)
+                {
+                    <tr>
+                        <td>@user.OrderNumber</td>
+                        <td>@user.Username</td>
+                        <td>@user.FullName</td>
+                        <td>@user.DateOfBirth.ToString("dd/MM/yyyy")</td>
+                        <td>@(user.IsMale ? "Nam" : "Nữ")</td>
+                        <td>@user.PhoneNumber</td>
+                        <td>@user.Email</td>
+                        <td>@(user.Group?.Name ?? "")</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="showEditUserModal(@user.Id)">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteUser(@user.Id)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="9" class="text-center">Không có dữ liệu</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- User Modal -->
+<div class="modal fade" id="userModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userModalTitle">Thêm người dùng mới</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="userId" />
+                    <input type="hidden" id="userGroupId" />
+                    <div class="mb-3">
+                        <label for="userUsername" class="form-label">Tài khoản</label>
+                        <input type="text" class="form-control" id="userUsername" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="userFullName" class="form-label">Họ tên</label>
+                        <input type="text" class="form-control" id="userFullName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="userDateOfBirth" class="form-label">Ngày sinh</label>
+                        <input type="date" class="form-control" id="userDateOfBirth" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Giới tính</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="userGender" id="userMale" value="true" checked>
+                            <label class="form-check-label" for="userMale">Nam</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="userGender" id="userFemale" value="false">
+                            <label class="form-check-label" for="userFemale">Nữ</label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="userPhoneNumber" class="form-label">Số điện thoại</label>
+                        <input type="tel" class="form-control" id="userPhoneNumber" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="userEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="userEmail" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-primary" onclick="saveUser()">Lưu</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let selectedGroupId = null;
+        let userModal = null;
+
+        $(document).ready(function () {
+            userModal = new bootstrap.Modal(document.getElementById('userModal'));
+            // Get groupId from URL query parameter if available
+            const urlParams = new URLSearchParams(window.location.search);
+            selectedGroupId = urlParams.get('groupId');
+            if (selectedGroupId) {
+                selectedGroupId = parseInt(selectedGroupId);
+                $('#userGroupId').val(selectedGroupId);
+            }
+        });
+
+        function showCreateUserModal() {
+            if (!selectedGroupId) {
+                showErrorMessage('Vui lòng chọn một nhóm trước khi thêm người dùng');
+                return;
+            }
+
+            // Reset form
+            $('#userForm')[0].reset();
+            $('#userId').val('');
+            $('#userGroupId').val(selectedGroupId);
+            $('#userModalTitle').text('Thêm người dùng mới');
+            
+            // Set default gender
+            $('input[name="userGender"][value="true"]').prop('checked', true);
+            
+            // Show modal
+            userModal.show();
+        }
+
+        function showEditUserModal(id) {
+            $('#userModalTitle').text('Sửa người dùng');
+            $.get('/User/GetById', { id: id }, function (user) {
+                $('#userId').val(user.id);
+                $('#userUsername').val(user.username);
+                $('#userFullName').val(user.fullName);
+                $('#userDateOfBirth').val(new Date(user.dateOfBirth).toISOString().split('T')[0]);
+                $(`input[name="userGender"][value="${user.isMale}"]`).prop('checked', true);
+                $('#userPhoneNumber').val(user.phoneNumber);
+                $('#userEmail').val(user.email);
+                $('#userModal').modal('show');
+            });
+        }
+
+        function saveUser() {
+            const form = $('#userForm')[0];
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            // Validate required fields manually
+            const username = $('#userUsername').val().trim();
+            const fullName = $('#userFullName').val().trim();
+            const dateOfBirth = $('#userDateOfBirth').val();
+            const phoneNumber = $('#userPhoneNumber').val().trim();
+            const email = $('#userEmail').val().trim();
+            const groupId = selectedGroupId;
+
+            if (!groupId) {
+                showErrorMessage('Vui lòng chọn nhóm trước khi thêm người dùng');
+                return;
+            }
+
+            if (!username) {
+                showErrorMessage('Vui lòng nhập tên tài khoản');
+                return;
+            }
+            if (!fullName) {
+                showErrorMessage('Vui lòng nhập họ tên');
+                return;
+            }
+            if (!dateOfBirth) {
+                showErrorMessage('Vui lòng chọn ngày sinh');
+                return;
+            }
+            if (!phoneNumber) {
+                showErrorMessage('Vui lòng nhập số điện thoại');
+                return;
+            }
+            if (!email) {
+                showErrorMessage('Vui lòng nhập email');
+                return;
+            }
+
+            const userData = {
+                Id: parseInt($('#userId').val()) || 0,
+                Username: username,
+                FullName: fullName,
+                DateOfBirth: dateOfBirth,
+                IsMale: $('input[name="userGender"]:checked').val() === 'true',
+                PhoneNumber: phoneNumber,
+                Email: email,
+                GroupId: groupId,
+                OrderNumber: 0
+            };
+
+            console.log('Sending user data:', userData);
+
+            $.ajax({
+                url: '/User/Create',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(userData),
+                success: function (response) {
+                    console.log('Server response:', response);
+                    if (response.success) {
+                        userModal.hide();
+                        location.reload();
+                        showSuccessMessage('Thêm người dùng thành công');
+                    } else {
+                        showErrorMessage(response.message || 'Có lỗi xảy ra');
+                    }
+                },
+                error: function (xhr) {
+                    console.log('Error:', xhr);
+                    let errorMessage = 'Có lỗi xảy ra';
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.errors) {
+                            errorMessage = response.errors.join('\n');
+                        } else if (response.error) {
+                            errorMessage = response.error;
+                        }
+                    } catch (e) {
+                        errorMessage = xhr.responseText;
+                    }
+                    showErrorMessage(errorMessage);
+                }
+            });
+        }
+
+        function deleteUser(id) {
+            if (confirm('Bạn có chắc chắn muốn xóa người dùng này?')) {
+                $.ajax({
+                    url: '/User/Delete',
+                    type: 'DELETE',
+                    data: { id: id },
+                    success: function (response) {
+                        if (response.success) {
+                            loadUsers(selectedGroupId);
+                            showSuccessMessage('Xóa người dùng thành công');
+                        } else {
+                            showErrorMessage(response.message || 'Có lỗi xảy ra');
+                        }
+                    },
+                    error: function (xhr) {
+                        showErrorMessage(xhr.responseText || 'Có lỗi xảy ra khi xóa người dùng');
+                    }
+                });
+            }
+        }
+    </script>
+} 

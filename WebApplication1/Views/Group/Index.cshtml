@@ -1,0 +1,509 @@
+@model IEnumerable<WebApplication1.Models.Group>
+
+@{
+    ViewData["Title"] = "Quản lý nhóm";
+}
+
+<div id="alertContainer"></div>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Danh sách nhóm</h5>
+                <button type="button" class="btn btn-primary btn-sm" onclick="showCreateGroupModal()">
+                    <i class="bi bi-plus"></i> Thêm mới
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="groupTree"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Danh sách người dùng</h5>
+                <button type="button" class="btn btn-primary btn-sm" onclick="showCreateUserModal()">
+                    <i class="bi bi-plus"></i> Thêm mới
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="userList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Group Modal -->
+<div class="modal fade" id="groupModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="groupModalTitle">Thêm nhóm mới</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="groupForm">
+                    <input type="hidden" id="groupId" />
+                    <div class="mb-3">
+                        <label for="groupName" class="form-label">Tên nhóm</label>
+                        <input type="text" class="form-control" id="groupName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="groupCode" class="form-label">Mã nhóm</label>
+                        <input type="text" class="form-control" id="groupCode" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="parentGroup" class="form-label">Nhóm cha</label>
+                        <select class="form-select" id="parentGroup">
+                            <option value="">Không có</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-primary" onclick="saveGroup()">Lưu</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Modal -->
+<div class="modal fade" id="userModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userModalTitle">Thêm người dùng mới</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="userId" name="Id" value="0" />
+                    <input type="hidden" id="userGroupId" name="GroupId" />
+                    <input type="hidden" id="userOrder" name="OrderNumber" value="0" />
+                    
+                    <div class="mb-3">
+                        <label for="userUsername" class="form-label">Tài khoản</label>
+                        <input type="text" class="form-control" id="userUsername" name="Username" required maxlength="50">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="userFullName" class="form-label">Họ tên</label>
+                        <input type="text" class="form-control" id="userFullName" name="FullName" required maxlength="100">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="userDateOfBirth" class="form-label">Ngày sinh</label>
+                        <input type="date" class="form-control" id="userDateOfBirth" name="DateOfBirth" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Giới tính</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="IsMale" id="userGenderMale" value="true" checked>
+                            <label class="form-check-label" for="userGenderMale">Nam</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="IsMale" id="userGenderFemale" value="false">
+                            <label class="form-check-label" for="userGenderFemale">Nữ</label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="userPhoneNumber" class="form-label">Số điện thoại</label>
+                        <input type="tel" class="form-control" id="userPhoneNumber" name="PhoneNumber" required maxlength="20">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="userEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="userEmail" name="Email" required maxlength="100">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-primary" onclick="saveUser()">Lưu</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let selectedGroupId = null;
+        let groupModal = null;
+        let userModal = null;
+        let jstreeInstance = null;
+
+        $(document).ready(function () {
+            groupModal = new bootstrap.Modal(document.getElementById('groupModal'));
+            userModal = new bootstrap.Modal(document.getElementById('userModal'));
+            initializeGroupTree();
+            loadGroups();
+        });
+
+        function initializeGroupTree() {
+            $('#groupTree').jstree({
+                core: {
+                    data: [],
+                    check_callback: true
+                },
+                plugins: ['contextmenu'],
+                contextmenu: {
+                    items: function (node) {
+                        return {
+                            edit: {
+                                label: "Sửa",
+                                action: function () {
+                                    showEditGroupModal(node.id);
+                                }
+                            },
+                            delete: {
+                                label: "Xóa",
+                                action: function () {
+                                    deleteGroup(node.id);
+                                }
+                            }
+                        };
+                    }
+                }
+            }).on('select_node.jstree', function (e, data) {
+                selectedGroupId = parseInt(data.node.id);
+                console.log('Selected group ID:', selectedGroupId);
+                loadUsers(selectedGroupId);
+            });
+
+            jstreeInstance = $('#groupTree').jstree(true);
+        }
+
+        function loadGroups() {
+            $.ajax({
+                url: '/Group/GetAll',
+                method: 'GET',
+                success: function (data) {
+                    const treeData = data.map(group => ({
+                        id: group.id.toString(),
+                        parent: group.parentId ? group.parentId.toString() : '#',
+                        text: group.name,
+                        state: {
+                            opened: true
+                        }
+                    }));
+
+                    if (jstreeInstance) {
+                        jstreeInstance.settings.core.data = treeData;
+                        jstreeInstance.refresh();
+                    }
+
+                    // Populate parent group dropdown
+                    $('#parentGroup').empty().append('<option value="">Không có</option>');
+                    data.forEach(group => {
+                        $('#parentGroup').append(`<option value="${group.id}">${group.name}</option>`);
+                    });
+                },
+                error: function (xhr) {
+                    showError('Không thể tải danh sách nhóm');
+                }
+            });
+        }
+
+        function loadUsers(groupId) {
+            if (!groupId) return;
+            
+            $.ajax({
+                url: '/User/Index',
+                method: 'GET',
+                data: { groupId: groupId },
+                success: function (data) {
+                    $('#userList').html(data);
+                    // Khởi tạo lại modal sau khi load view
+                    userModal = new bootstrap.Modal(document.getElementById('userModal'));
+                    // Cập nhật selectedGroupId cho view user
+                    $('#userGroupId').val(groupId);
+                },
+                error: function () {
+                    showError('Không thể tải danh sách người dùng');
+                }
+            });
+        }
+
+        function showCreateGroupModal() {
+            $('#groupModalTitle').text('Thêm nhóm mới');
+            $('#groupForm')[0].reset();
+            $('#groupId').val('');
+            groupModal.show();
+        }
+
+        function showEditGroupModal(id) {
+            $('#groupModalTitle').text('Sửa nhóm');
+            $.get('/Group/GetById', { id: id }, function (group) {
+                $('#groupId').val(group.id);
+                $('#groupName').val(group.name);
+                $('#groupCode').val(group.code);
+                $('#parentGroup').val(group.parentId || '');
+                groupModal.show();
+            });
+        }
+
+        function saveGroup() {
+            if (!$('#groupForm')[0].checkValidity()) {
+                $('#groupForm')[0].reportValidity();
+                return;
+            }
+
+            const group = {
+                id: $('#groupId').val() || 0,
+                name: $('#groupName').val(),
+                code: $('#groupCode').val(),
+                parentId: $('#parentGroup').val() || null
+            };
+
+            const url = group.id ? '/Group/Edit' : '/Group/Create';
+            const method = group.id ? 'PUT' : 'POST';
+
+            $.ajax({
+                url: url,
+                method: method,
+                contentType: 'application/json',
+                data: JSON.stringify(group),
+                success: function (response) {
+                    if (response.success) {
+                        groupModal.hide();
+                        loadGroups();
+                        showSuccess('Lưu nhóm thành công');
+                    }
+                },
+                error: function (xhr) {
+                    if (xhr.status === 400) {
+                        const errors = xhr.responseJSON;
+                        let errorMessage = '';
+                        if (errors && typeof errors === 'object') {
+                            for (const key in errors) {
+                                if (Array.isArray(errors[key])) {
+                                    errorMessage += errors[key].join('\n') + '\n';
+                                } else {
+                                    errorMessage += errors[key] + '\n';
+                                }
+                            }
+                        } else if (xhr.responseText) {
+                            errorMessage = xhr.responseText;
+                        }
+                        showError(errorMessage || 'Dữ liệu không hợp lệ');
+                    } else {
+                        showError('Đã có lỗi xảy ra khi lưu nhóm');
+                    }
+                }
+            });
+        }
+
+        function deleteGroup(id) {
+            if (confirm('Bạn có chắc chắn muốn xóa nhóm này?')) {
+                $.ajax({
+                    url: '/Group/Delete',
+                    method: 'DELETE',
+                    data: { id: id },
+                    success: function (response) {
+                        if (response.success) {
+                            loadGroups();
+                            showSuccess('Xóa nhóm thành công');
+                        }
+                    },
+                    error: function (xhr) {
+                        showError('Đã có lỗi xảy ra khi xóa nhóm');
+                    }
+                });
+            }
+        }
+
+        function showCreateUserModal() {
+            if (!selectedGroupId) {
+                showError('Vui lòng chọn một nhóm trước khi thêm người dùng');
+                return;
+            }
+
+            console.log('Opening create user modal with group ID:', selectedGroupId);
+
+            $('#userForm')[0].reset();
+            $('#userId').val('0');
+            $('#userGroupId').val(selectedGroupId);
+            $('#userOrder').val('0');
+            $('#userModalTitle').text('Thêm người dùng mới');
+            $('#userGenderMale').prop('checked', true);
+            
+            // Log để kiểm tra giá trị đã được set
+            console.log('GroupId after setting:', $('#userGroupId').val());
+            
+            userModal.show();
+        }
+
+        function showEditUserModal(id) {
+            $('#userModalTitle').text('Sửa người dùng');
+            $.get('/User/GetById', { id: id }, function (user) {
+                $('#userId').val(user.id);
+                $('#username').val(user.username);
+                $('#fullName').val(user.fullName);
+                $('#dateOfBirth').val(new Date(user.dateOfBirth).toISOString().split('T')[0]);
+                $(`input[name="gender"][value="${user.isMale}"]`).prop('checked', true);
+                $('#phoneNumber').val(user.phoneNumber);
+                $('#email').val(user.email);
+                $('#userOrderNumber').val(user.orderNumber);
+                $('#userGroupId').val(user.groupId);
+                userModal.show();
+            });
+        }
+
+        function saveUser() {
+            const form = $('#userForm')[0];
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            // Validate required fields manually
+            const username = $('#userUsername').val().trim();
+            const fullName = $('#userFullName').val().trim();
+            const dateOfBirth = $('#userDateOfBirth').val();
+            const phoneNumber = $('#userPhoneNumber').val().trim();
+            const email = $('#userEmail').val().trim();
+            const groupId = parseInt($('#userGroupId').val());
+            
+            console.log('Current selectedGroupId:', selectedGroupId);
+            console.log('GroupId from hidden field:', groupId);
+
+            if (!username) {
+                showError('Vui lòng nhập tài khoản');
+                return;
+            }
+            if (!fullName) {
+                showError('Vui lòng nhập họ tên');
+                return;
+            }
+            if (!dateOfBirth) {
+                showError('Vui lòng chọn ngày sinh');
+                return;
+            }
+            if (!phoneNumber) {
+                showError('Vui lòng nhập số điện thoại');
+                return;
+            }
+            if (!email) {
+                showError('Vui lòng nhập email');
+                return;
+            }
+            if (!groupId) {
+                showError('Vui lòng chọn nhóm');
+                return;
+            }
+
+            // Log values before creating user object
+            console.log('Form values before creating user:', {
+                username,
+                fullName,
+                dateOfBirth,
+                phoneNumber,
+                email,
+                groupId,
+                isMale: $('input[name="IsMale"]:checked').val()
+            });
+
+            const user = {
+                Id: 0,
+                Username: username,
+                FullName: fullName,
+                DateOfBirth: dateOfBirth,
+                IsMale: $('input[name="IsMale"]:checked').val() === 'true',
+                PhoneNumber: phoneNumber,
+                Email: email,
+                OrderNumber: 0,
+                Group: null,
+                GroupId: groupId
+            };
+
+            console.log('Sending user data:', user);
+
+            $.ajax({
+                url: '/User/Create',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(user),
+                success: function (response) {
+                    console.log('Server response:', response);
+                    if (response.success) {
+                        userModal.hide();
+                        loadUsers(selectedGroupId);
+                        showSuccess(response.message || 'Thêm người dùng thành công');
+                        form.reset();
+                    } else {
+                        showError(response.message || 'Có lỗi xảy ra');
+                    }
+                },
+                error: function (xhr) {
+                    console.log('Error response:', xhr);
+                    console.log('Status:', xhr.status);
+                    console.log('Status Text:', xhr.statusText);
+                    console.log('Response Text:', xhr.responseText);
+                    let errorMessage = 'Có lỗi xảy ra';
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.error) {
+                            errorMessage = response.error;
+                        } else if (response.errors) {
+                            errorMessage = Object.values(response.errors)
+                                .flat()
+                                .join('\n');
+                        } else if (typeof response === 'string') {
+                            errorMessage = response;
+                        }
+                    } catch (e) {
+                        console.log('Error parsing response:', e);
+                        errorMessage = xhr.responseText;
+                    }
+                    showError(errorMessage);
+                }
+            });
+        }
+
+        function deleteUser(id) {
+            if (confirm('Bạn có chắc chắn muốn xóa người dùng này?')) {
+                $.ajax({
+                    url: '/User/Delete',
+                    method: 'DELETE',
+                    data: { id: id },
+                    success: function () {
+                        loadUsers(selectedGroupId);
+                    }
+                });
+            }
+        }
+
+        function showError(message) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            const container = document.getElementById('alertContainer');
+            if (container) {
+                container.appendChild(alertDiv);
+                setTimeout(() => alertDiv.remove(), 5000);
+            }
+        }
+
+        function showSuccess(message) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show';
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            const container = document.getElementById('alertContainer');
+            if (container) {
+                container.appendChild(alertDiv);
+                setTimeout(() => alertDiv.remove(), 5000);
+            }
+        }
+    </script>
+} 
