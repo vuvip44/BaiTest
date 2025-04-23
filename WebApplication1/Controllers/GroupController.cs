@@ -4,27 +4,30 @@ using WebApplication1.Repositories;
 
 namespace WebApplication1.Controllers
 {
+    [ApiController]
+    [Route("api/[controller]")]
     public class GroupController : Controller
     {
         private readonly IGroupRepository _groupRepository;
 
+        
         public GroupController(IGroupRepository groupRepository)
         {
             _groupRepository = groupRepository;
         }
 
-        public async Task<IActionResult> Index()
+        
+        [HttpGet]
+        [Route("")]
+        public async Task<ActionResult<IEnumerable<Group>>> Index()
         {
-            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-            {
-                var groups = await _groupRepository.GetAllAsync();
-                return Json(groups);
-            }
-            return View();
+            var groups = await _groupRepository.GetAllAsync();
+            return Ok(groups);
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetById(int id)
+        
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Group>> GetById(int id)
         {
             var group = await _groupRepository.GetByIdAsync(id);
             if (group == null)
@@ -34,8 +37,9 @@ namespace WebApplication1.Controllers
             return Json(group);
         }
 
+        
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] Group group)
+        public async Task<ActionResult<Group>> Create([FromBody] Group group)
         {
             if (!ModelState.IsValid)
             {
@@ -52,8 +56,9 @@ namespace WebApplication1.Controllers
             return Json(new { success = true, data = createdGroup });
         }
 
-        [HttpPut]
-        public async Task<IActionResult> Edit([FromBody] Group group)
+        
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Edit(int id, [FromBody] Group group)
         {
             if (!ModelState.IsValid)
             {
@@ -70,18 +75,22 @@ namespace WebApplication1.Controllers
             return Json(new { success = true });
         }
 
-        [HttpDelete]
+        
+        [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
             await _groupRepository.DeleteAsync(id);
             return Json(new { success = true });
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetAll()
+        
+        [HttpGet("all")]
+        public async Task<ActionResult<IEnumerable<Group>>> GetAll()
         {
             var groups = await _groupRepository.GetAllAsync();
             return Json(groups);
         }
+
+        
     }
-} 
+}

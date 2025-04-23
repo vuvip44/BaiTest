@@ -9,6 +9,8 @@ using System.Linq;
 
 namespace WebApplication1.Controllers
 {
+    [ApiController]
+    [Route("api/[controller]")]
     public class UserController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -20,7 +22,9 @@ namespace WebApplication1.Controllers
             _logger = logger;
         }
 
-        public IActionResult Index(int? groupId)
+
+        [HttpGet]
+        public ActionResult<IEnumerable<User>> Index(int? groupId)
         {
             try
             {
@@ -48,17 +52,14 @@ namespace WebApplication1.Controllers
 
                 var users = _context.Users
                     .Where(u => allGroupIds.Contains(u.GroupId))
-                    .Include(u => u.Group) 
+                    .Include(u => u.Group)
                     .OrderBy(u => u.Group.Name)
                     .ThenBy(u => u.OrderNumber)
                     .ToList();
 
-                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-                {
-                    return PartialView(users);
-                }
 
-                return View(users);
+
+                return Ok(users);
             }
             catch (Exception ex)
             {
@@ -67,8 +68,10 @@ namespace WebApplication1.Controllers
             }
         }
 
+
+
         [HttpPost]
-        public IActionResult Create([FromBody] User user)
+        public ActionResult<User> Create([FromBody] User user)
         {
             try
             {
@@ -179,7 +182,7 @@ namespace WebApplication1.Controllers
                 var maxOrder = _context.Users
                     .Where(u => u.GroupId == user.GroupId)
                     .Select(u => u.OrderNumber)
-                    .ToList() 
+                    .ToList()
                     .DefaultIfEmpty(0)
                     .Max();
 
@@ -190,10 +193,11 @@ namespace WebApplication1.Controllers
 
                 _logger.LogInformation("User created successfully: {User}", JsonSerializer.Serialize(user));
 
-                return Ok(new { 
-                    success = true, 
-                    data = user, 
-                    message = "Thêm người dùng thành công" 
+                return Ok(new
+                {
+                    success = true,
+                    data = user,
+                    message = "Thêm người dùng thành công"
                 });
             }
             catch (Exception ex)
@@ -203,12 +207,18 @@ namespace WebApplication1.Controllers
             }
         }
 
-        [HttpPut]
-        public IActionResult Edit([FromBody] User user)
+
+        [HttpPut("{id}")]
+        public async Task<ActionResult> Edit(int id, [FromBody] User user)
         {
             if (user == null)
             {
                 return BadRequest("Dữ liệu người dùng không hợp lệ");
+            }
+
+            if (id != user.Id)
+            {
+                return BadRequest("Id trong URL và body không khớp");
             }
 
             if (!ModelState.IsValid)
@@ -222,7 +232,7 @@ namespace WebApplication1.Controllers
 
             try
             {
-                var existingUser = _context.Users.Find(user.Id);
+                var existingUser = await _context.Users.FindAsync(id);
                 if (existingUser == null)
                 {
                     return NotFound("Không tìm thấy người dùng này");
@@ -240,16 +250,18 @@ namespace WebApplication1.Controllers
                     return BadRequest("Email này đã được sử dụng");
                 }
 
+                // Update fields
                 existingUser.Username = user.Username;
                 existingUser.FullName = user.FullName;
                 existingUser.DateOfBirth = user.DateOfBirth;
                 existingUser.IsMale = user.IsMale;
                 existingUser.PhoneNumber = user.PhoneNumber;
                 existingUser.Email = user.Email;
+                existingUser.GroupId = user.GroupId; // Nếu có
 
-                _context.SaveChanges();
+                await _context.SaveChangesAsync();
 
-                return Json(new { success = true, data = existingUser, message = "Cập nhật người dùng thành công" });
+                return Ok(new { success = true, data = existingUser, message = "Cập nhật người dùng thành công" });
             }
             catch (Exception ex)
             {
@@ -257,8 +269,10 @@ namespace WebApplication1.Controllers
             }
         }
 
-        [HttpDelete]
-        public IActionResult Delete(int id)
+
+
+        [HttpDelete("{id}")]
+        public ActionResult Delete(int id)
         {
             try
             {
@@ -272,7 +286,7 @@ namespace WebApplication1.Controllers
                             return NotFound("Không tìm thấy người dùng này");
                         }
 
-                        
+
                         var usersToUpdate = _context.Users
                             .Where(u => u.GroupId == user.GroupId && u.OrderNumber > user.OrderNumber)
                             .OrderBy(u => u.OrderNumber);
@@ -301,8 +315,9 @@ namespace WebApplication1.Controllers
             }
         }
 
-        [HttpGet]
-        public IActionResult GetById(int id)
+
+        [HttpGet("{id}")]
+        public ActionResult<User> GetById(int id)
         {
             try
             {
@@ -320,4 +335,4 @@ namespace WebApplication1.Controllers
             }
         }
     }
-} 
+}
